@@ -166,7 +166,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      xml généré pointe directement vers les bons logos.
 1.18 Correction de quelques variables réguilère l'année et le réalisateur
 1.19 Correction d'un bug dans le cas ou un $ est mis à la fin du titre ou dans d'autre champs.
-1.20 Ajout de 2 options pour filtrer les programmes cryptés de Canal+ et Paris Première. 
+1.20 Ajout de 2 options pour filtrer les programmes cryptés de Canal+ et Paris Première.
+1.21 Le CSA ayant supprimé de son site les pictogrammes de rating dans un format exploitable,
+     remplacement des URL par celle de Wikimedia Commons.
+     Ajout initialisation oubliée de la variable $crypted.
+     Traitement des réalisateurs multiples (comme pour les acteurs)
+     Correction détection de sous-champ "Stéréo"
+     Correction récupération du sous-champs "Durée" : il n'était plus reconnu et la 
+        gestion de l'unité n'était pas faite.
+     Suppression variable $showview qui n'était plus utilisé.
+     Le format des pages récupérées de Télérama a légérement changé :
+        Ajout du sous-champ "Rediffusion :" suivi de la date de la prochaine redif. (n'est pas 
+           pris en compte par XMLTV, mais pollue le sous-champ "Rediffusion" (sans les ':')
+        
 =cut
 
 
@@ -389,7 +401,7 @@ sub debug_print( @ );
 sub get_page( $ );
 
 # Set this to 1 of you debug strings
-my $DEBUG_FR = 0;
+my $DEBUG_FR = 1;
 # Internal debug functions
 sub debug_print( @ ) {
   if ($DEBUG_FR) { print @_; }
@@ -801,7 +813,7 @@ sub process_channel_grid_page( $$$$ ) {
 	#print "Getting URL : ".$url."\n";
 	my @lines = split(/:\$\$\$:/,$page);
 
-	my ($chname, $title, $starthour, $endhour, $genre, $description, $specialfield, $age, $field1, $stars, $critic, $date, $field4, $day, $year, $mount, $showview);
+	my ($chname, $title, $starthour, $endhour, $genre, $description, $specialfield, $age, $field1, $stars, $critic, $date, $field4, $day, $year, $mount);
 
 	foreach my $line ( @lines ) {
 
@@ -819,9 +831,10 @@ sub process_channel_grid_page( $$$$ ) {
 
 		$date=$year.$mount.$day;
 		debug_print($title." - ".$starthour." - ".$endhour."\n");
-		debug_print("description:".$description."\n");
-		debug_print("genre:".$genre."\n");
-		debug_print("specalfield: ".$specialfield."\n");
+		debug_print("description  : ".$description."\n");
+		debug_print("genre        : ".$genre."\n");
+		debug_print("specialfield : ".$specialfield."\n");
+		debug_print("critic       : ".$critic."\n");
 
 		my ($shh,$shm,$shs) = split(/:/,$starthour);
 		my $imgurl= $CHANNEL_ICON_PAGE.$year.'-'.$mount.'-'.$day.'_'.$chid.'_'.$shh.':'.$shm.'.jpg';
@@ -853,7 +866,7 @@ sub process_channel_grid_page( $$$$ ) {
 		debug_print($start.">".$stop."\n");
 #####
 
-		my $crypted;
+		my $crypted = 0;
 		if ( $no_cryptedcplus && $chname =~ m/Canal+/ ) {
 			$crypted = 1;
 		}		
@@ -868,13 +881,16 @@ sub process_channel_grid_page( $$$$ ) {
 		my $season_text;
 		my $epstring;
 		my $rating2;
+		my $Duree2;
 		$episode = "-1";
 		$season = "-1";
 		$episode_text = "-1";
 		$season_text = "-1";
 		foreach my $special (@specials) {
-			if ($special =~ m/Durée ; ([0-9]+) min/) {
-				$prog{length} = $1;
+			if ($special =~ m/Dur.+e : ([0-9]+) min/) {
+				$Duree2 = $1 * 60;
+#				debug_print("Durée2 :".$Duree2."\n");
+				$prog{length} = $Duree2;
 			} elsif ($special =~ /Episode : /) {
 				debug_print("Episode:".$special."\n");
 #			$description = $special." - ".$description;
@@ -896,7 +912,7 @@ sub process_channel_grid_page( $$$$ ) {
 			} elsif ($special =~ m/VOST/i) {   # présence de sous-titrage dans l'image'
 				debug_print("Sous-titré:".$special."\n");
 				$prog{subtitles} = [ { type => 'onscreen', language => ['fr'] } ]
-			} elsif ($special =~ s/Sc.*nariste//i || $special =~ s/Sc.*nario//i) {
+			} elsif ($special =~ s/Sc.+nariste//i || $special =~ s/Sc.+nario//i) {
 				debug_print("Auteurs:".$special."\n");
 				my @writers = split(/, /,$special);
 				foreach my $auteur (@writers) {
@@ -909,13 +925,18 @@ sub process_channel_grid_page( $$$$ ) {
 					push @{$prog{credits}{actor}}, $acteur;
 				}
 			} elsif ($special =~ s/R.+alisateur : //i) {
-				push @{$prog{credits}{director}}, $special;
-			} elsif ($special =~ s/Pr.*sentateur : //i) {
+
+				debug_print("Réalisateur: ".$special."\n");
+				my @realisateurs = split(/, /,$special);
+				foreach my $realisateur (@realisateurs) {
+					push @{$prog{credits}{director}}, $realisateur;
+				}
+			} elsif ($special =~ s/Pr.+sentateur : //i) {
 				my @presenters = split(/, /,$special);
 				foreach my $presenter (@presenters) {
 					push @{$prog{credits}{presenter}}, $presenter ;
 				}
-			} elsif ($special =~ s/Invit.*s : //i) {
+			} elsif ($special =~ s/Invit.+s : //i) {
 				my @guests = split(/, /,$special);
 				foreach my $guest (@guests) {
 					push @{$prog{credits}{guest}}, $guest ;
@@ -931,7 +952,7 @@ sub process_channel_grid_page( $$$$ ) {
 				$prog{showview} = $1;
 			} elsif ($special =~ s/Ann.+e : //i) {
 				$prog{'date'} = $special;
-			} elsif ($special =~ /St.r.o/) {
+			} elsif ($special =~ /St.+r.+o/) {
 				$prog{'audio'}{stereo} = "stereo";
 			} elsif ($special =~ m/Dolby digital/) {
 				$prog{'audio'}{stereo} = "digital";
@@ -947,8 +968,11 @@ sub process_channel_grid_page( $$$$ ) {
 				$subgenre = $special;
 			} elsif ($special =~ m/Titre original : (.*)/) {
 				$prog{title_orig} = $1;
-			} elsif ( ($special =~ m/In.*dit/) || ($special =~ m/Premi.*re diffusion/) ) {
+			} elsif ( ($special =~ m/In.+dit/) || ($special =~ m/Premi.+re diffusion/) ) {
 				$prog{premiere} = [];
+			} elsif ($special =~ m/Rediffusion :/) {
+				# ne rien faire c'est pour éviter que le champ soit confondu avec le suivant
+				# le format XMLTV ne prévoit pas cette info.
 			} elsif ($special =~ m/Rediffusion/) {
 				$prog{'previously-shown'} = {};
 			} elsif ($special =~ m/En 16:9/) {
@@ -1019,19 +1043,18 @@ sub process_channel_grid_page( $$$$ ) {
 			}
 			push @{$prog{desc}}, [$description, $LANG ];
 		}
-		#$prog{showview}=$showview;
 
 
 		my $icon;
 		if ($age > 0 && !$rating2) {
 			if ($age <= 10) {
-				$icon = 'http://www.csa.fr/picts/visuels/picto_cat2.gif';
+				$icon = 'http://upload.wikimedia.org/wikipedia/commons/thumb/b/bf/Moins10.svg/200px-Moins10.svg.png';
 			} elsif ($age <= 12) {
-				$icon = 'http://www.csa.fr/picts/visuels/picto_cat3.gif';
+				$icon = 'http://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Moins12.svg/200px-Moins12.svg.png';
 			} elsif ($age <= 16)  {
-				$icon = 'http://www.csa.fr/picts/visuels/picto_cat4.gif';
+				$icon = 'http://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Moins16.svg/200px-Moins16.svg.png';
 			} else {
-				$icon = 'http://www.csa.fr/picts/visuels/picto_cat5.gif';
+				$icon = 'http://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/Moins18.svg/200px-Moins18.svg.png';
 			}
 			$age = -$age;
 	#		$prog{rating} = [[ $age ]];
