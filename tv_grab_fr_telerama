@@ -1,4 +1,4 @@
-#!/share/MD0_DATA/.qpkg/xmltv/bin/perl -I/share/MD0_DATA/.qpkg/xmltv/lib/5.14.2 -I/share/MD0_DATA/.qpkg/xmltv/lib/site_perl/5.14.2 -w
+#!/usr/bin/perl
 #   coding: utf-8
 
 eval 'exec /usr/bin/perl  -S $0 ${1+"$@"}'
