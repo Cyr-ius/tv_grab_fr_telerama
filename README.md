@@ -4,4 +4,4 @@
 
 Il est utilisable en lieu et place de tv_grab_fr. Il suffit de télécharger la dernière version et de l'utiliser comme tv_grab_fr.
 
-Modifier par Cyr-ius afin d'implémenter la gestion des catégories et permettent la colorisation de l'epg dans Kodi
+Modifié par Cyr-ius afin d'implémenter la gestion des catégories et permettent la colorisation de l'epg dans Kodi
