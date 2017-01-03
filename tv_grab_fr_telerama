@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/share/MD0_DATA/.qpkg/xmltv/bin/perl -I/share/MD0_DATA/.qpkg/xmltv/lib/5.14.2 -I/share/MD0_DATA/.qpkg/xmltv/lib/site_perl/5.14.2 -w
 #   coding: utf-8
 
 eval 'exec /usr/bin/perl  -S $0 ${1+"$@"}'
@@ -178,6 +178,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      Le format des pages récupérées de Télérama a légérement changé :
         Ajout du sous-champ "Rediffusion :" suivi de la date de la prochaine redif. (n'est pas 
            pris en compte par XMLTV, mais pollue le sous-champ "Rediffusion" (sans les ':')
+1.22 Correction du genre et sous genre et ajout des catégorisations afin d'avoir une colorisation
+    correct dans l' EPG sous Kodi
         
 =cut
 
@@ -314,6 +316,132 @@ $ua->env_proxy;
 
 
 #***************************************************************************
+# The categories recognized by tvheadend (see epg.c) 
+#***************************************************************************
+
+my $MOVIE             =    "Movie / Drama";
+my $THRILLER          =    "Detective / Thriller";
+my $ADVENTURE         =    "Adventure / Western / War";
+my $SF                =    "Science fiction / Fantasy / Horror";
+my $COMEDY            =    "Comedy";
+my $SOAP              =    "Soap / Melodrama / Folkloric";
+my $ROMANCE           =    "Romance";
+my $HISTORICAL        =    "Serious / Classical / Religious / Historical movie / Drama";
+my $XXX               =    "Adult movie / Drama";
+
+my $NEWS              =    "News / Current affairs";
+my $WEATHER           =    "News / Weather report";
+my $NEWS_MAGAZINE     =    "News magazine";
+my $DOCUMENTARY       =    "Documentary";
+my $DEBATE            =    "Discussion / Interview / Debate";
+my $INTERVIEW         =    $DEBATE ;
+
+my $SHOW              =    "Show / Game show";
+my $GAME              =    "Game show / Quiz / Contest";
+my $VARIETY           =    "Variety show";
+my $TALKSHOW          =    "Talk show";
+
+my $SPORT             =    "Sports";
+my $SPORT_SPECIAL     =    "Special events (Olympic Games; World Cup; etc.)";
+my $SPORT_MAGAZINE    =    "Sports magazines";
+my $FOOTBALL          =    "Football / Soccer";
+my $TENNIS            =    "Tennis / Squash";
+my $SPORT_TEAM        =    "Team sports (excluding football)";
+my $ATHLETICS         =    "Athletics";
+my $SPORT_MOTOR       =    "Motor sport";
+my $SPORT_WATER       =    "Water sport";
+
+my $KIDS              =    "Children's / Youth programmes";
+my $KIDS_0_5          =    "Pre-school children's programmes";
+my $KIDS_6_14         =    "Entertainment programmes for 6 to 14";
+my $KIDS_10_16        =    "Entertainment programmes for 10 to 16";
+my $EDUCATIONAL       =    "Informational / Educational / School programmes";
+my $CARTOON           =    "Cartoons / Puppets";
+
+my $MUSIC             =    "Music / Ballet / Dance";
+my $ROCK_POP          =    "Rock / Pop";
+my $CLASSICAL         =    "Serious music / Classical music";
+my $FOLK              =    "Folk / Traditional music";
+my $JAZZ              =    "Jazz";
+my $OPERA             =    "Musical / Opera";
+
+my $CULTURE           =    "Arts / Culture (without music)";
+my $PERFORMING        =    "Performing arts";
+my $FINE_ARTS         =    "Fine arts";
+my $RELIGION          =    "Religion";
+my $POPULAR_ART       =    "Popular culture / Traditional arts";
+my $LITERATURE        =    "Literature";
+my $FILM              =    "Film / Cinema";
+my $EXPERIMENTAL_FILM =    "Experimental film / Video";
+my $BROADCASTING      =    "Broadcasting / Press";
+
+my $SOCIAL            =    "Social / Political issues / Economics";
+my $MAGAZINE          =    "Magazines / Reports / Documentary";
+my $ECONOMIC          =    "Economics / Social advisory";
+my $VIP               =    "Remarkable people";
+
+my $SCIENCE           =    "Education / Science / Factual topics";
+my $NATURE            =    "Nature / Animals / Environment";
+my $TECHNOLOGY        =    "Technology / Natural sciences";
+my $DIOLOGY           =    $TECHNOLOGY;
+my $MEDECINE          =    "Medicine / Physiology / Psychology";
+my $FOREIGN           =    "Foreign countries / Expeditions";
+my $SPIRITUAL         =    "Social / Spiritual sciences";
+my $FURTHER_EDUCATION =    "Further education";
+my $LANGUAGES         =    "Languages";
+
+my $HOBBIES           =    "Leisure hobbies";
+my $TRAVEL            =    "Tourism / Travel";
+my $HANDICRAF         =    "Handicraft";
+my $MOTORING          =    "Motoring";
+my $FITNESS           =    "Fitness and health";
+my $COOKING           =    "Cooking";
+my $SHOPPING          =    "Advertisement / Shopping";
+my $GARDENING         =    "Gardening";
+
+my %REPLACE=(
+    "Météo"              => $WEATHER ,
+    "Film"               => $MOVIE ,
+    "Théâtre"            => $PERFORMING,
+    "Ballet"             => $OPERA ,
+    "Clips"              => $MUSIC ,
+    "Concert"            => $MUSIC ,
+    "Court métrage"      => $EXPERIMENTAL_FILM,
+    "Débat"              => $SOCIAL ,
+    "Dessin animé"       => $CARTOON ,
+    "Divertissement"     => $VARIETY ,
+    "Documentaire"       => $DOCUMENTARY ,
+    "Drame"              => $SOAP ,
+    "Émission"           => 0,
+    "Feuilleton"         => $SOAP ,
+    "Fin"                => 0,
+    "Fin des programmes" => 0 ,
+    "Interview"          => $INTERVIEW ,
+    "Jeu"                => $GAME ,
+    "Jeunesse"           => $KIDS ,
+    "Journal"            => $NEWS ,
+    "Loterie"            => 0 ,
+    "Magazine"           => $MAGAZINE ,
+    "Opéra"              => $OPERA ,
+    "Série"              => $SOAP  ,
+    "Spectacle"          => $PERFORMING ,
+    "Sport"              => $SPORT ,
+    "Talk show"          => $TALKSHOW ,
+    "Téléfilm"           => $MOVIE ,
+    "Télé-réalité"       => $VARIETY ,
+    "Téléréalité"        => $VARIETY ,
+    "Tiercé"             => $SPORT ,
+    "Divers"             => $VARIETY,
+    "Variétés"         => $VARIETY,
+    "Religion"           => $HISTORICAL ,
+    "Musique"            => $MUSIC ,
+    "Fitness"           => $FITNESS ,
+    "Sports"           => $SPORT ,
+    "Clip"           => $MUSIC ,
+    "Anime"           => $CARTOON ,
+    "Humour"           => $COMEDY ,
+ ) ; 
+#***************************************************************************
 # Options processing, warnings, checks and default parameters
 #***************************************************************************
 die 'Number of days must not be negative'  if (defined $opt_days && $opt_days < 0);
@@ -401,7 +529,7 @@ sub debug_print( @ );
 sub get_page( $ );
 
 # Set this to 1 of you debug strings
-my $DEBUG_FR = 1;
+my $DEBUG_FR = 0;
 # Internal debug functions
 sub debug_print( @ ) {
   if ($DEBUG_FR) { print @_; }
@@ -680,6 +808,17 @@ print STDERR "Grabber process finished in " . $script_duration . " seconds.\n" i
 #***************************************************************************
 # Specific functions for grabbing information
 #***************************************************************************
+# Build categories filter
+sub myfilter {
+  my ($a) = @_;
+  if ( exists $REPLACE{$a} ) {     
+      return $REPLACE{$a} ;
+  } else {
+      print STDERR "Warning: Unmanaged category: '$a'\n" ;
+      return $a ;
+  }
+}
+
 # Build the filename used to stored channels configured manually
 sub build_other_channel_filename() {
 	# Get the file name/path for OTHERCHANNELS
@@ -1033,7 +1172,8 @@ sub process_channel_grid_page( $$$$ ) {
 		push @{$prog{icon}}, {src => $imgurl};
 
 		if (defined $subgenre) {
-			$prog{category} = [ [ xmlencoding(lc($genre)), $LANG ], [ xmlencoding(lc($subgenre)), $LANG ] ];
+			#$prog{category} = [ [ xmlencoding(lc($genre)), $LANG ], [ xmlencoding(lc($subgenre)), $LANG ] ];
+			$prog{category} = [ [ xmlencoding(lc(myfilter($genre))), $LANG ] ];
 		}
 
 
